@@ -8,7 +8,8 @@
     "setup": "node scripts/setup.js",
     "init-db": "node scripts/init-db.js",
     "init-data": "node scripts/init-db-data.js",
-    "test-api": "node api-tests/index.js"
+    "test-api": "node api-tests/index.js",
+    "test-db": "node scripts/test-db-connection.js"
   },
   "dependencies": {
     "@cloudbase/node-sdk": "^3.14.1",

@@ -1,0 +1,21 @@
+{
+
+  "DB_HOST_INTERNAL": "10.27.100.151",
+  "DB_PORT_INTERNAL": "3306",
+  "DB_HOST_EXTERNAL": "sh-cynosdbmysql-grp-goudlu7k.sql.tencentcdb.com",
+  "DB_PORT_EXTERNAL": "22087",
+  "DB_USER": "a572204654",
+  "DB_PASSWORD": "572204654aA",
+  "DB_NAME": "jlzr1101-5g9kplxza13a780d",
+  "WECHAT_APPID": "wxbd778f929f40d8c2",
+  "WECHAT_APPSECRET": "d2408b2a5907c6ade1bd17b2f75f0e65",
+  "JWT_SECRET": "supervision-log-jwt-secret-XyZ9@2024!Abc",
+  "DOUBAO_API_KEY": "af1085bd-3749-4303-bbd3-efcb287194fa",
+  "DOUBAO_ENDPOINT_ID": "ep-20251106172018-dglqw",
+  "DOUBAO_API_URL": "https://ark.cn-beijing.volces.com/api/v3",
+  "QWEATHER_API_KEY": "d7eb9f449c434e7f8a8cc32aab171128",
+  "SERVICE_NAME": "express",
+  "SERVICE_DOMAIN": "https://api.yimengpl.com",
+  "PORT": "80"
+}
+

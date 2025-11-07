@@ -1,189 +1,305 @@
-const officegen = require('officegen')
+const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, AlignmentType, VerticalAlign, BorderStyle, TextDirection, TextRun } = require('docx')
 
 /**
- * 生成监理日志Word文档
+ * 生成监理日志Word文档（按照标准格式1:1还原）
  * @param {Object} logData - 监理日志数据
  * @returns {Promise<Buffer>} Word文档Buffer
  */
 async function generateSupervisionLogWord(logData) {
-  return new Promise((resolve, reject) => {
-    try {
-      // 创建Word文档对象
-      const docx = officegen({
-        type: 'docx',
-        subject: '监理日志',
-        keywords: '监理,日志,工程',
-        description: '监理日志导出文档'
-      })
+  try {
+    // 创建文档
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1440,    // 1英寸 = 1440 twips
+              right: 1440,
+              bottom: 1440,
+              left: 1440
+            }
+          }
+        },
+        children: [
+          // ============== 标题 ==============
+          new Paragraph({
+            text: '监理日志',
+            alignment: AlignmentType.CENTER,
+            spacing: {
+              after: 400
+            },
+            style: 'Heading1'
+          }),
 
-      // ============== 标题 ==============
-      const titleParagraph = docx.createP({ align: 'center' })
-      titleParagraph.addText('监理日志', {
-        font_size: 18,
-        bold: true,
-        font_face: '宋体'
-      })
+          // ============== 主表格 ==============
+          new Table({
+            width: {
+              size: 100,
+              type: WidthType.PERCENTAGE
+            },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: '000000' }
+            },
+            rows: [
+              // 第1行：单位工程名称和编号
+              new TableRow({
+                height: { value: 600, rule: 'atLeast' },
+                children: [
+                  new TableCell({
+                    width: { size: 18, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('单位工程名称', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 32, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createLeftParagraph(logData.work_name || '')]
+                  }),
+                  new TableCell({
+                    width: { size: 18, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('单位工程编号', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 32, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createLeftParagraph(logData.work_code || '')]
+                  })
+                ]
+              }),
 
-      // 添加空行
-      docx.createP()
+              // 第2行：日期
+              new TableRow({
+                height: { value: 600, rule: 'atLeast' },
+                children: [
+                  new TableCell({
+                    width: { size: 18, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('日期', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 82, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    columnSpan: 3,
+                    children: [createLeftParagraph(formatDate(logData.log_date))]
+                  })
+                ]
+              }),
 
-      // ============== 基本信息表格 ==============
-      const infoTable = [
-        [
-          { val: '项目名称', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: logData.project_name || '', opts: { sz: 24 } },
-          { val: '项目编号', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: logData.project_code || '', opts: { sz: 24 } }
-        ],
-        [
-          { val: '工程名称', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: logData.work_name || '', opts: { sz: 24 } },
-          { val: '工程编号', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: logData.work_code || '', opts: { sz: 24 } }
-        ],
-        [
-          { val: '日志日期', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: formatDate(logData.log_date), opts: { sz: 24 } },
-          { val: '气象情况', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: logData.weather || '', opts: { sz: 24 } }
-        ]
-      ]
+              // 第3行：气象
+              new TableRow({
+                height: { value: 600, rule: 'atLeast' },
+                children: [
+                  new TableCell({
+                    width: { size: 18, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('气象', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 82, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    columnSpan: 3,
+                    children: [createLeftParagraph(logData.weather || '')]
+                  })
+                ]
+              }),
 
-      docx.createTable(infoTable, {
-        tableColWidth: [2000, 4000, 2000, 4000],
-        tableSize: 24,
-        tableAlign: 'center',
-        tableFontFamily: '宋体',
-        borders: true
-      })
+              // 第4行：工程动态
+              new TableRow({
+                height: { value: 2000, rule: 'atLeast' },
+                children: [
+                  new TableCell({
+                    width: { size: 6, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    textDirection: TextDirection.BOTTOM_TO_TOP_LEFT_TO_RIGHT,
+                    children: [createCenteredParagraph('工程动态', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 94, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.TOP,
+                    columnSpan: 3,
+                    children: [createContentParagraph(logData.project_dynamics || '')]
+                  })
+                ]
+              }),
 
-      // 添加空行
-      docx.createP()
+              // 第5行：监理工作情况
+              new TableRow({
+                height: { value: 2000, rule: 'atLeast' },
+                children: [
+                  new TableCell({
+                    width: { size: 6, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    textDirection: TextDirection.BOTTOM_TO_TOP_LEFT_TO_RIGHT,
+                    children: [createCenteredParagraph('监理工作情况', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 94, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.TOP,
+                    columnSpan: 3,
+                    children: [createContentParagraph(logData.supervision_work || '')]
+                  })
+                ]
+              }),
 
-      // ============== 工程动态 ==============
-      const dynamicsTitleParagraph = docx.createP()
-      dynamicsTitleParagraph.addText('一、工程动态', {
-        font_size: 14,
-        bold: true,
-        font_face: '宋体'
-      })
+              // 第6行：安全监理工作情况
+              new TableRow({
+                height: { value: 2000, rule: 'atLeast' },
+                children: [
+                  new TableCell({
+                    width: { size: 6, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    textDirection: TextDirection.BOTTOM_TO_TOP_LEFT_TO_RIGHT,
+                    children: [createCenteredParagraph('安全监理工作情况', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 94, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.TOP,
+                    columnSpan: 3,
+                    children: [createContentParagraph(logData.safety_work || '')]
+                  })
+                ]
+              }),
 
-      const dynamicsContent = docx.createP()
-      dynamicsContent.addText(logData.project_dynamics || '无', {
-        font_size: 12,
-        font_face: '宋体'
-      })
-
-      // 添加空行
-      docx.createP()
-
-      // ============== 监理工作情况 ==============
-      const supervisionTitleParagraph = docx.createP()
-      supervisionTitleParagraph.addText('二、监理工作情况', {
-        font_size: 14,
-        bold: true,
-        font_face: '宋体'
-      })
-
-      const supervisionContent = docx.createP()
-      supervisionContent.addText(logData.supervision_work || '无', {
-        font_size: 12,
-        font_face: '宋体'
-      })
-
-      // 添加空行
-      docx.createP()
-
-      // ============== 安全监理工作情况 ==============
-      const safetyTitleParagraph = docx.createP()
-      safetyTitleParagraph.addText('三、安全监理工作情况', {
-        font_size: 14,
-        bold: true,
-        font_face: '宋体'
-      })
-
-      const safetyContent = docx.createP()
-      safetyContent.addText(logData.safety_work || '无', {
-        font_size: 12,
-        font_face: '宋体'
-      })
-
-      // 添加空行
-      docx.createP()
-      docx.createP()
-
-      // ============== 签名信息表格 ==============
-      const signTable = [
-        [
-          { val: '记录人', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: logData.recorder_name || '', opts: { sz: 24 } },
-          { val: '记录日期', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: formatDate(logData.recorder_date), opts: { sz: 24 } }
-        ],
-        [
-          { val: '审核人', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: logData.reviewer_name || '', opts: { sz: 24 } },
-          { val: '审核日期', opts: { b: true, sz: 24, shd: { fill: 'f0f0f0' } } },
-          { val: formatDate(logData.reviewer_date), opts: { sz: 24 } }
-        ]
-      ]
-
-      docx.createTable(signTable, {
-        tableColWidth: [2000, 4000, 2000, 4000],
-        tableSize: 24,
-        tableAlign: 'center',
-        tableFontFamily: '宋体',
-        borders: true
-      })
-
-      // 如果有附件信息，添加附件列表
-      if (logData.attachments && logData.attachments.length > 0) {
-        docx.createP()
-        docx.createP()
-
-        const attachmentTitleParagraph = docx.createP()
-        attachmentTitleParagraph.addText('附件列表', {
-          font_size: 14,
-          bold: true,
-          font_face: '宋体'
-        })
-
-        logData.attachments.forEach((attachment, index) => {
-          const attachmentParagraph = docx.createP()
-          attachmentParagraph.addText(`${index + 1}. ${attachment.file_name || attachment.fileName} (${formatFileSize(attachment.file_size || attachment.fileSize)})`, {
-            font_size: 12,
-            font_face: '宋体'
+              // 第7行：签名区
+              new TableRow({
+                height: { value: 800, rule: 'atLeast' },
+                children: [
+                  new TableCell({
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('记录人', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 18, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph(logData.recorder_name || '')]
+                  }),
+                  new TableCell({
+                    width: { size: 17, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('年   月   日')]
+                  }),
+                  new TableCell({
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('审核人', true)]
+                  }),
+                  new TableCell({
+                    width: { size: 18, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph(logData.reviewer_name || '')]
+                  }),
+                  new TableCell({
+                    width: { size: 17, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [createCenteredParagraph('年   月   日')]
+                  })
+                ]
+              })
+            ]
           })
-        })
+        ]
+      }],
+      styles: {
+        paragraphStyles: [
+          {
+            id: 'Heading1',
+            name: 'Heading 1',
+            basedOn: 'Normal',
+            next: 'Normal',
+            run: {
+              size: 44,  // 22pt
+              bold: true,
+              font: '宋体'
+            },
+            paragraph: {
+              spacing: {
+                after: 200
+              }
+            }
+          }
+        ]
       }
+    })
 
-      // 生成文档Buffer
-      const chunks = []
-      
-      // 创建可写流收集数据
-      const { Writable } = require('stream')
-      const outputStream = new Writable({
-        write(chunk, encoding, callback) {
-          chunks.push(chunk)
-          callback()
-        }
+    // 生成Buffer
+    const buffer = await Packer.toBuffer(doc)
+    return buffer
+
+  } catch (error) {
+    console.error('生成Word文档错误:', error)
+    throw error
+  }
+}
+
+/**
+ * 创建居中对齐的段落
+ * @param {string} text - 文本内容
+ * @param {boolean} bold - 是否加粗
+ * @returns {Paragraph}
+ */
+function createCenteredParagraph(text, bold = false) {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    children: [
+      new TextRun({
+        text: text,
+        size: 24,  // 12pt
+        bold: bold,
+        font: '宋体'
       })
+    ]
+  })
+}
 
-      outputStream.on('finish', () => {
-        const buffer = Buffer.concat(chunks)
-        resolve(buffer)
+/**
+ * 创建左对齐的段落
+ * @param {string} text - 文本内容
+ * @returns {Paragraph}
+ */
+function createLeftParagraph(text) {
+  return new Paragraph({
+    alignment: AlignmentType.LEFT,
+    children: [
+      new TextRun({
+        text: text,
+        size: 24,  // 12pt
+        font: '宋体'
       })
+    ]
+  })
+}
 
-      outputStream.on('error', (err) => {
-        reject(err)
+/**
+ * 创建内容段落（带缩进）
+ * @param {string} text - 文本内容
+ * @returns {Paragraph}
+ */
+function createContentParagraph(text) {
+  return new Paragraph({
+    alignment: AlignmentType.LEFT,
+    indent: {
+      left: 400,
+      right: 200
+    },
+    spacing: {
+      line: 360,  // 1.5倍行距
+      before: 100,
+      after: 100
+    },
+    children: [
+      new TextRun({
+        text: text,
+        size: 24,  // 12pt
+        font: '宋体'
       })
-
-      // 生成文档
-      docx.generate(outputStream)
-
-    } catch (error) {
-      reject(error)
-    }
+    ]
   })
 }
 
@@ -222,4 +338,3 @@ function formatFileSize(bytes) {
 module.exports = {
   generateSupervisionLogWord
 }
-
