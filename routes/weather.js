@@ -19,6 +19,85 @@ const {
 } = require('../utils/qweather')
 
 /**
+ * 获取当前气象信息（兼容接口）
+ * GET /api/weather/current
+ * 
+ * 查询参数:
+ * - latitude: 纬度
+ * - longitude: 经度
+ * 
+ * 返回数据:
+ * - weather: 气象信息字符串（格式：晴，15-25℃）
+ * - weatherText: 天气描述
+ * - temperature: 当前温度
+ * - temperatureMin: 最低温度
+ * - temperatureMax: 最高温度
+ * - humidity: 湿度
+ * - windDirection: 风向
+ * - windScale: 风力等级
+ * - updateTime: 更新时间
+ */
+router.get('/current', async (req, res) => {
+  try {
+    const { latitude, longitude } = req.query
+
+    // 参数验证
+    if (!latitude || !longitude) {
+      return badRequest(res, '经纬度参数不能为空')
+    }
+
+    const lat = parseFloat(latitude)
+    const lng = parseFloat(longitude)
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return badRequest(res, '经纬度参数格式不正确')
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return badRequest(res, '经纬度参数超出有效范围')
+    }
+
+    // 和风天气API需要的location格式：经度,纬度
+    const location = `${lng},${lat}`
+
+    // 并发请求实时天气和3天预报
+    const [nowResult, dailyResult] = await Promise.all([
+      getWeatherNow(location),
+      getWeatherDaily(location, 3)
+    ])
+
+    if (!nowResult.success) {
+      return serverError(res, nowResult.error || '获取实时天气失败')
+    }
+
+    if (!dailyResult.success) {
+      return serverError(res, dailyResult.error || '获取天气预报失败')
+    }
+
+    // 组合数据
+    const now = nowResult.data
+    const forecast = dailyResult.data[0]
+
+    const weatherData = {
+      weather: `${now.text}，${forecast.tempMin}-${forecast.tempMax}℃`,
+      weatherText: now.text,
+      temperature: parseFloat(now.temp),
+      temperatureMin: parseFloat(forecast.tempMin),
+      temperatureMax: parseFloat(forecast.tempMax),
+      humidity: parseFloat(now.humidity),
+      windDirection: now.windDir,
+      windScale: now.windScale,
+      updateTime: now.obsTime
+    }
+
+    return success(res, weatherData, '获取气象信息成功')
+  } catch (error) {
+    console.error('获取气象信息错误:', error)
+    return serverError(res, error.message || '获取气象信息失败')
+  }
+})
+
+/**
  * 获取实时天气
  * GET /api/weather/now
  * 
@@ -312,6 +391,40 @@ router.get('/comprehensive', async (req, res) => {
   } catch (error) {
     console.error('获取综合天气信息错误:', error)
     return serverError(res, '获取综合天气信息失败')
+  }
+})
+
+/**
+ * 调试接口 - 检查环境变量配置
+ * GET /api/weather/debug-config
+ * 
+ * 返回数据:
+ * - 环境变量配置状态
+ */
+router.get('/debug-config', async (req, res) => {
+  try {
+    const config = {
+      keyId: process.env.QWEATHER_KEY_ID ? '已配置 ✅' : '未配置 ❌',
+      keyIdValue: process.env.QWEATHER_KEY_ID || null,
+      projectId: process.env.QWEATHER_PROJECT_ID ? '已配置 ✅' : '未配置 ❌',
+      projectIdValue: process.env.QWEATHER_PROJECT_ID || null,
+      privateKey: process.env.QWEATHER_PRIVATE_KEY ? '已配置 ✅' : '未配置 ❌',
+      privateKeyPreview: process.env.QWEATHER_PRIVATE_KEY 
+        ? process.env.QWEATHER_PRIVATE_KEY.substring(0, 50) + '...'
+        : null,
+      privateKeyLength: process.env.QWEATHER_PRIVATE_KEY 
+        ? process.env.QWEATHER_PRIVATE_KEY.length
+        : 0,
+      privateKeyHasBr: process.env.QWEATHER_PRIVATE_KEY 
+        ? process.env.QWEATHER_PRIVATE_KEY.includes('<br>')
+        : false,
+      nodeEnv: process.env.NODE_ENV || 'development'
+    }
+
+    return success(res, config, '环境变量配置状态')
+  } catch (error) {
+    console.error('获取配置状态错误:', error)
+    return serverError(res, '获取配置状态失败')
   }
 })
 
