@@ -21,7 +21,23 @@ function generateQWeatherToken(kid, sub, privateKeyPath) {
   try {
     // 读取私钥
     const privateKey = fs.readFileSync(privateKeyPath, 'utf8')
-    
+    return generateQWeatherTokenFromKey(kid, sub, privateKey)
+  } catch (error) {
+    console.error('生成和风天气JWT失败:', error)
+    throw new Error('生成JWT失败: ' + error.message)
+  }
+}
+
+/**
+ * 使用私钥字符串生成和风天气 JWT token
+ * 
+ * @param {string} kid - 凭据ID
+ * @param {string} sub - 项目ID
+ * @param {string} privateKey - 私钥内容（PEM格式字符串）
+ * @returns {string} JWT token
+ */
+function generateQWeatherTokenFromKey(kid, sub, privateKey) {
+  try {
     // JWT Header
     const header = {
       alg: 'EdDSA',  // Ed25519 使用 EdDSA 算法
@@ -101,20 +117,30 @@ function getQWeatherToken() {
   // 获取配置
   const kid = process.env.QWEATHER_KEY_ID
   const sub = process.env.QWEATHER_PROJECT_ID
-  const privateKeyPath = path.join(__dirname, '..', 'ed25519-private.pem')
   
   // 验证配置
   if (!kid || !sub) {
     throw new Error('和风天气配置不完整，请检查环境变量 QWEATHER_KEY_ID 和 QWEATHER_PROJECT_ID')
   }
   
-  // 检查私钥文件是否存在
-  if (!fs.existsSync(privateKeyPath)) {
-    throw new Error(`私钥文件不存在: ${privateKeyPath}`)
-  }
+  let token
   
-  // 生成新的 token
-  const token = generateQWeatherToken(kid, sub, privateKeyPath)
+  // 优先从环境变量读取私钥（云托管环境）
+  let privateKeyEnv = process.env.QWEATHER_PRIVATE_KEY
+  if (privateKeyEnv) {
+    // 处理可能的 <br> 标签（云托管环境变量可能使用HTML换行）
+    privateKeyEnv = privateKeyEnv.replace(/<br>/g, '\n').replace(/<br\/>/g, '\n')
+    console.log('使用环境变量中的私钥生成JWT token')
+    token = generateQWeatherTokenFromKey(kid, sub, privateKeyEnv)
+  } else {
+    // 从文件读取私钥（本地开发环境）
+    const privateKeyPath = path.join(__dirname, '..', 'ed25519-private.pem')
+    if (!fs.existsSync(privateKeyPath)) {
+      throw new Error(`私钥文件不存在: ${privateKeyPath}，且环境变量 QWEATHER_PRIVATE_KEY 未配置`)
+    }
+    console.log('使用私钥文件生成JWT token')
+    token = generateQWeatherToken(kid, sub, privateKeyPath)
+  }
   
   // 更新缓存（token 有效期1小时）
   tokenCache = {
@@ -138,6 +164,7 @@ function clearTokenCache() {
 
 module.exports = {
   generateQWeatherToken,
+  generateQWeatherTokenFromKey,
   getQWeatherToken,
   clearTokenCache
 }
