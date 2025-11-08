@@ -11,6 +11,9 @@
     "test-api": "node api-tests/index.js",
     "test-db": "node scripts/test-db-connection.js",
     "verify": "node scripts/verify-all-features.js",
+    "verify-api": "node test/api-verification.js",
+    "verify-quick": "node test/quick-verify.js",
+    "verify-interactive": "node test/interactive-verify.js",
     "setup-voice": "node scripts/setup-voice-recognition.js",
     "test-voice": "node test/voice-recognition-test.js"
   },
