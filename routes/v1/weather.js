@@ -95,7 +95,9 @@ router.get('/current', authenticate, async (req, res) => {
           const forecast = forecastRes.data.daily[0]
 
           weatherData = {
-            weather: `${now.text}，${forecast.tempMin}-${forecast.tempMax}℃`,
+            // 完整气象字符串：天气 雨 · 气温: 25-31 · 风向: 东 · 风力: 4
+            weather: `天气 ${now.text} · 气温: ${forecast.tempMin}-${forecast.tempMax} · 风向: ${now.windDir} · 风力: ${now.windScale}`,
+            // 单独字段（方便前端使用）
             weatherText: now.text,
             temperature: parseFloat(now.temp),
             temperatureMin: parseFloat(forecast.tempMin),
@@ -127,15 +129,20 @@ router.get('/current', authenticate, async (req, res) => {
       const weatherTypes = ['晴', '多云', '阴', '小雨', '中雨']
       const weatherType = weatherTypes[Math.floor(Math.random() * weatherTypes.length)]
       
+      const windDir = ['北风', '东北风', '东风', '东南风', '南风', '西南风', '西风', '西北风'][Math.floor(Math.random() * 8)]
+      const windScale = Math.floor(Math.random() * 4) + 1
+      
       weatherData = {
-        weather: `${weatherType}，${minTemp}-${maxTemp}℃`,
+        // 完整气象字符串：天气 雨 · 气温: 25-31 · 风向: 东 · 风力: 4
+        weather: `天气 ${weatherType} · 气温: ${minTemp}-${maxTemp} · 风向: ${windDir} · 风力: ${windScale}`,
+        // 单独字段（方便前端使用）
         weatherText: weatherType,
         temperature: currentTemp,
         temperatureMin: minTemp,
         temperatureMax: maxTemp,
         humidity: Math.floor(Math.random() * 40) + 40, // 40-80%
-        windDirection: ['北风', '东北风', '东风', '东南风', '南风', '西南风', '西风', '西北风'][Math.floor(Math.random() * 8)],
-        windScale: `${Math.floor(Math.random() * 4) + 1}`,
+        windDirection: windDir,
+        windScale: `${windScale}`,
         updateTime: new Date().toISOString(),
         isMock: true
       }

@@ -47,9 +47,9 @@ wx.getLocation({
 ```json
 {
   "code": 0,
-  "message": "操作成功",
+  "message": "获取气象信息成功",
   "data": {
-    "weather": "晴，16-24℃",
+    "weather": "天气 晴 · 气温: 16-24 · 风向: 南风 · 风力: 2",
     "weatherText": "晴",
     "temperature": 20,
     "temperatureMin": 16,
@@ -57,7 +57,7 @@ wx.getLocation({
     "humidity": 65,
     "windDirection": "南风",
     "windScale": "2",
-    "updateTime": "2024-10-21T10:00:00.000Z"
+    "updateTime": "2024-11-08T10:00:00+08:00"
   },
   "timestamp": 1699200000000
 }
@@ -65,18 +65,18 @@ wx.getLocation({
 
 ### 响应字段说明
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| weather | String | 气象信息字符串（可直接用于监理日志） |
-| weatherText | String | 天气描述（晴、多云、阴、小雨等） |
-| temperature | Number | 当前温度（℃） |
-| temperatureMin | Number | 最低温度（℃） |
-| temperatureMax | Number | 最高温度（℃） |
-| humidity | Number | 湿度（%） |
-| windDirection | String | 风向 |
-| windScale | String | 风力等级 |
-| updateTime | String | 更新时间 |
-| isMock | Boolean | 是否为模拟数据（可选字段，仅在使用模拟数据时出现） |
+| 字段名 | 类型 | 说明 | 示例 |
+|--------|------|------|------|
+| weather | String | 完整气象信息字符串（可直接用于监理日志） | "天气 雨 · 气温: 25-31 · 风向: 东 · 风力: 4" |
+| weatherText | String | 天气描述（晴、多云、阴、小雨等） | "晴" |
+| temperature | Number | 当前温度（℃） | 20 |
+| temperatureMin | Number | 最低温度（℃） | 16 |
+| temperatureMax | Number | 最高温度（℃） | 24 |
+| humidity | Number | 湿度（%） | 65 |
+| windDirection | String | 风向 | "南风" |
+| windScale | String | 风力等级 | "2" |
+| updateTime | String | 更新时间 | "2024-11-08T10:00:00+08:00" |
+| isMock | Boolean | 是否为模拟数据（可选字段，仅在使用模拟数据时出现） | true |
 
 ---
 

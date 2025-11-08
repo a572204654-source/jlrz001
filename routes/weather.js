@@ -79,7 +79,9 @@ router.get('/current', async (req, res) => {
     const forecast = dailyResult.data[0]
 
     const weatherData = {
-      weather: `${now.text}，${forecast.tempMin}-${forecast.tempMax}℃`,
+      // 完整气象字符串：天气 雨 · 气温: 25-31 · 风向: 东 · 风力: 4
+      weather: `天气 ${now.text} · 气温: ${forecast.tempMin}-${forecast.tempMax} · 风向: ${now.windDir} · 风力: ${now.windScale}`,
+      // 单独字段（方便前端使用）
       weatherText: now.text,
       temperature: parseFloat(now.temp),
       temperatureMin: parseFloat(forecast.tempMin),
