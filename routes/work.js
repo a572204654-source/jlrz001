@@ -16,15 +16,16 @@ const { authenticate } = require('../middleware/auth')
  */
 router.get('/', authenticate, async (req, res) => {
   try {
+    const userId = req.userId
     const projectId = req.query.projectId
     const page = parseInt(req.query.page) || 1
     const pageSize = parseInt(req.query.pageSize) || 20
     const offset = (page - 1) * pageSize
     const keyword = req.query.keyword || ''
 
-    // 构建查询条件
-    let whereClause = '1=1'
-    const params = []
+    // 构建查询条件 - 只显示当前用户创建的工程
+    let whereClause = 'w.creator_id = ?'
+    const params = [userId]
 
     if (projectId) {
       whereClause += ' AND w.project_id = ?'
@@ -102,8 +103,9 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询工程详情
+    // 查询工程详情 - 只能查看自己创建的工程
     const works = await query(
       `SELECT 
         w.id,
@@ -125,12 +127,12 @@ router.get('/:id', authenticate, async (req, res) => {
         w.updated_at
        FROM works w
        LEFT JOIN projects p ON w.project_id = p.id
-       WHERE w.id = ?`,
-      [id]
+       WHERE w.id = ? AND w.creator_id = ?`,
+      [id, userId]
     )
 
     if (works.length === 0) {
-      return notFound(res, '工程不存在')
+      return notFound(res, '工程不存在或无权访问')
     }
 
     const w = works[0]
@@ -256,6 +258,7 @@ router.post('/', authenticate, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
     const {
       workName,
       workCode,
@@ -266,14 +269,14 @@ router.put('/:id', authenticate, async (req, res) => {
       description
     } = req.body
 
-    // 查询工程
+    // 查询工程 - 验证权限
     const works = await query(
-      'SELECT * FROM works WHERE id = ?',
-      [id]
+      'SELECT * FROM works WHERE id = ? AND creator_id = ?',
+      [id, userId]
     )
 
     if (works.length === 0) {
-      return notFound(res, '工程不存在')
+      return notFound(res, '工程不存在或无权操作')
     }
 
     // 如果修改了工程编号，检查是否重复
@@ -319,15 +322,16 @@ router.put('/:id', authenticate, async (req, res) => {
 router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询工程
+    // 查询工程 - 验证权限
     const works = await query(
-      'SELECT * FROM works WHERE id = ?',
-      [id]
+      'SELECT * FROM works WHERE id = ? AND creator_id = ?',
+      [id, userId]
     )
 
     if (works.length === 0) {
-      return notFound(res, '工程不存在')
+      return notFound(res, '工程不存在或无权操作')
     }
 
     // 检查是否有关联的监理日志
@@ -360,15 +364,16 @@ router.delete('/:id', authenticate, async (req, res) => {
 router.post('/:id/pin', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询工程是否存在
+    // 查询工程是否存在 - 验证权限
     const works = await query(
-      'SELECT id, is_pinned FROM works WHERE id = ?',
-      [id]
+      'SELECT id, is_pinned FROM works WHERE id = ? AND creator_id = ?',
+      [id, userId]
     )
 
     if (works.length === 0) {
-      return notFound(res, '工程不存在')
+      return notFound(res, '工程不存在或无权操作')
     }
 
     // 如果已经置顶，直接返回成功
@@ -399,15 +404,16 @@ router.post('/:id/pin', authenticate, async (req, res) => {
 router.post('/:id/unpin', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询工程是否存在
+    // 查询工程是否存在 - 验证权限
     const works = await query(
-      'SELECT id, is_pinned FROM works WHERE id = ?',
-      [id]
+      'SELECT id, is_pinned FROM works WHERE id = ? AND creator_id = ?',
+      [id, userId]
     )
 
     if (works.length === 0) {
-      return notFound(res, '工程不存在')
+      return notFound(res, '工程不存在或无权操作')
     }
 
     // 如果已经取消置顶，直接返回成功

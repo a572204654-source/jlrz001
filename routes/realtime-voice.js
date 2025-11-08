@@ -7,6 +7,9 @@ const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 const { getVoiceRecognitionService } = require('../utils/voiceRecognition')
 
+// 为 router 启用 WebSocket 支持
+expressWs(router)
+
 // 配置文件上传（使用内存存储）
 const upload = multer({
   storage: multer.memoryStorage(),

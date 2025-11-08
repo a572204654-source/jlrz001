@@ -124,8 +124,9 @@ router.get('/supervision-logs', authenticate, async (req, res) => {
 router.get('/supervision-logs/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询监理日志详情
+    // 查询监理日志详情 - 只能查看自己创建的日志
     const logs = await query(
       `SELECT 
         sl.id,
@@ -151,12 +152,12 @@ router.get('/supervision-logs/:id', authenticate, async (req, res) => {
        LEFT JOIN projects p ON sl.project_id = p.id
        LEFT JOIN works w ON sl.work_id = w.id
        LEFT JOIN users u ON sl.user_id = u.id
-       WHERE sl.id = ?`,
-      [id]
+       WHERE sl.id = ? AND sl.user_id = ?`,
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权访问')
     }
 
     // 查询附件
@@ -283,6 +284,7 @@ router.post('/supervision-logs', authenticate, async (req, res) => {
 router.put('/supervision-logs/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
     const {
       logDate,
       weather,
@@ -295,14 +297,14 @@ router.put('/supervision-logs/:id', authenticate, async (req, res) => {
       reviewerDate
     } = req.body
 
-    // 查询监理日志
+    // 查询监理日志 - 验证权限
     const logs = await query(
-      'SELECT * FROM supervision_logs WHERE id = ?',
-      [id]
+      'SELECT * FROM supervision_logs WHERE id = ? AND user_id = ?',
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权操作')
     }
 
     // 如果修改了日期，检查是否重复
@@ -351,15 +353,16 @@ router.put('/supervision-logs/:id', authenticate, async (req, res) => {
 router.delete('/supervision-logs/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询监理日志
+    // 查询监理日志 - 验证权限
     const logs = await query(
-      'SELECT * FROM supervision_logs WHERE id = ?',
-      [id]
+      'SELECT * FROM supervision_logs WHERE id = ? AND user_id = ?',
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权操作')
     }
 
     // 删除关联的附件

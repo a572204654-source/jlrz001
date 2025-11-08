@@ -10,14 +10,15 @@ const { authenticate } = require('../../middleware/auth')
  */
 router.get('/projects', authenticate, async (req, res) => {
   try {
+    const userId = req.userId
     const page = parseInt(req.query.page) || 1
     const pageSize = parseInt(req.query.pageSize) || 20
     const offset = (page - 1) * pageSize
     const keyword = req.query.keyword || ''
 
-    // 构建查询条件
-    let whereClause = '1=1'
-    const params = []
+    // 构建查询条件 - 只显示当前用户创建的项目
+    let whereClause = 'p.creator_id = ?'
+    const params = [userId]
 
     if (keyword) {
       whereClause += ' AND (p.project_name LIKE ? OR p.project_code LIKE ?)'
@@ -67,8 +68,9 @@ router.get('/projects', authenticate, async (req, res) => {
 router.get('/projects/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询项目详情
+    // 查询项目详情 - 只能查看自己创建的项目
     const projects = await query(
       `SELECT 
         p.id,
@@ -83,12 +85,12 @@ router.get('/projects/:id', authenticate, async (req, res) => {
         (SELECT COUNT(*) FROM works WHERE project_id = p.id) as workCount,
         p.created_at as createdAt
        FROM projects p
-       WHERE p.id = ?`,
-      [id]
+       WHERE p.id = ? AND p.creator_id = ?`,
+      [id, userId]
     )
 
     if (projects.length === 0) {
-      return notFound(res, '项目不存在')
+      return notFound(res, '项目不存在或无权访问')
     }
 
     return success(res, projects[0])
@@ -164,6 +166,7 @@ router.post('/projects', authenticate, async (req, res) => {
 router.put('/projects/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
     const {
       projectName,
       projectCode,
@@ -175,14 +178,14 @@ router.put('/projects/:id', authenticate, async (req, res) => {
       endDate
     } = req.body
 
-    // 查询项目
+    // 查询项目 - 验证权限
     const projects = await query(
-      'SELECT * FROM projects WHERE id = ?',
-      [id]
+      'SELECT * FROM projects WHERE id = ? AND creator_id = ?',
+      [id, userId]
     )
 
     if (projects.length === 0) {
-      return notFound(res, '项目不存在')
+      return notFound(res, '项目不存在或无权操作')
     }
 
     // 如果修改了项目编号，检查是否重复
@@ -234,15 +237,16 @@ router.put('/projects/:id', authenticate, async (req, res) => {
 router.delete('/projects/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询项目
+    // 查询项目 - 验证权限
     const projects = await query(
-      'SELECT * FROM projects WHERE id = ?',
-      [id]
+      'SELECT * FROM projects WHERE id = ? AND creator_id = ?',
+      [id, userId]
     )
 
     if (projects.length === 0) {
-      return notFound(res, '项目不存在')
+      return notFound(res, '项目不存在或无权操作')
     }
 
     // 检查是否有关联的工程

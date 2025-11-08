@@ -150,8 +150,9 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询监理日志详情
+    // 查询监理日志详情 - 只能查看自己创建的日志
     const logs = await query(
       `SELECT 
         sl.id,
@@ -184,12 +185,12 @@ router.get('/:id', authenticate, async (req, res) => {
        LEFT JOIN projects p ON sl.project_id = p.id
        LEFT JOIN works w ON sl.work_id = w.id
        LEFT JOIN users u ON sl.user_id = u.id
-       WHERE sl.id = ?`,
-      [id]
+       WHERE sl.id = ? AND sl.user_id = ?`,
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权访问')
     }
 
     // 查询附件
@@ -378,6 +379,7 @@ router.post('/', authenticate, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
     const {
       logDate,
       weather,
@@ -390,14 +392,14 @@ router.put('/:id', authenticate, async (req, res) => {
       reviewerDate
     } = req.body
 
-    // 查询监理日志
+    // 查询监理日志 - 验证权限
     const logs = await query(
-      'SELECT * FROM supervision_logs WHERE id = ?',
-      [id]
+      'SELECT * FROM supervision_logs WHERE id = ? AND user_id = ?',
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权操作')
     }
 
     // 如果修改了日期，检查是否重复
@@ -446,15 +448,16 @@ router.put('/:id', authenticate, async (req, res) => {
 router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询监理日志
+    // 查询监理日志 - 验证权限
     const logs = await query(
-      'SELECT * FROM supervision_logs WHERE id = ?',
-      [id]
+      'SELECT * FROM supervision_logs WHERE id = ? AND user_id = ?',
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权操作')
     }
 
     // 删除关联的附件
@@ -564,15 +567,16 @@ router.get('/:id/export', authenticate, async (req, res) => {
 router.post('/:id/pin', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询监理日志是否存在
+    // 查询监理日志是否存在 - 验证权限
     const logs = await query(
-      'SELECT id, is_pinned FROM supervision_logs WHERE id = ?',
-      [id]
+      'SELECT id, is_pinned FROM supervision_logs WHERE id = ? AND user_id = ?',
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权操作')
     }
 
     // 如果已经置顶，直接返回成功
@@ -603,15 +607,16 @@ router.post('/:id/pin', authenticate, async (req, res) => {
 router.post('/:id/unpin', authenticate, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.userId
 
-    // 查询监理日志是否存在
+    // 查询监理日志是否存在 - 验证权限
     const logs = await query(
-      'SELECT id, is_pinned FROM supervision_logs WHERE id = ?',
-      [id]
+      'SELECT id, is_pinned FROM supervision_logs WHERE id = ? AND user_id = ?',
+      [id, userId]
     )
 
     if (logs.length === 0) {
-      return notFound(res, '监理日志不存在')
+      return notFound(res, '监理日志不存在或无权操作')
     }
 
     // 如果已经取消置顶，直接返回成功
