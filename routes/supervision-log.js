@@ -530,7 +530,11 @@ router.get('/:id/export', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error('导出监理日志错误:', error)
-    return serverError(res, '导出失败')
+    // 在开发环境返回详细错误信息，生产环境返回通用消息
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? `导出失败: ${error.message}`
+      : '导出失败'
+    return serverError(res, errorMessage)
   }
 })
 
