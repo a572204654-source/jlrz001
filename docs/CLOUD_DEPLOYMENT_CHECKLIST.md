@@ -21,22 +21,6 @@
 
 ## 必需的环境变量配置
 
-### 腾讯云语音识别配置
-
-在云托管环境变量中配置以下变量：
-
-```bash
-# 腾讯云密钥（必需，使用标准环境变量名）
-TENCENTCLOUD_SECRET_ID=你的SecretId
-TENCENTCLOUD_SECRET_KEY=你的SecretKey
-TENCENT_APP_ID=你的AppId
-
-# 腾讯云区域（可选，默认：ap-guangzhou）
-TENCENT_REGION=ap-guangzhou
-```
-
-> **重要**：必须使用标准环境变量名 `TENCENTCLOUD_SECRET_ID` 和 `TENCENTCLOUD_SECRET_KEY`（腾讯云云托管推荐）。代码也支持旧变量名 `TENCENT_SECRET_ID` 和 `TENCENT_SECRET_KEY` 作为向后兼容，但建议使用标准名称。
-
 ### 数据库配置
 
 ```bash
@@ -132,21 +116,6 @@ node scripts/diagnose-cloud-env.js https://api.yimengpl.com
 
 ---
 
-## 测试语音识别功能
-
-配置完成后，运行测试脚本验证功能：
-
-```bash
-node test/test-voice-recognition-cloud.js
-```
-
-预期结果：
-- ✅ 健康检查通过
-- ✅ 登录获取Token成功
-- ✅ 语音识别成功
-- ✅ 获取历史记录成功
-- ✅ 获取统计信息成功
-
 ---
 
 ## 常见问题排查
@@ -212,7 +181,6 @@ node test/test-voice-recognition-cloud.js
 
 ## 相关文档
 
-- [语音识别功能文档](./VOICE_RECOGNITION.md)
 - [API接口文档](./API.md)
 - [部署文档](./DEPLOYMENT.md)
 

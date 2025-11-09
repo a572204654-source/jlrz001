@@ -6,7 +6,6 @@
 require('dotenv').config()
 const axios = require('axios')
 const { query } = require('../config/database')
-const { getVoiceRecognitionService } = require('../utils/voiceRecognition')
 const config = require('../config')
 
 // 云托管服务地址（从环境变量或命令行参数获取）
@@ -163,29 +162,6 @@ async function checkLocalDatabase() {
     console.log('  ✅ 数据库连接成功')
     diagnosis.localEnv.database = { connected: true }
     
-    // 检查表是否存在
-    try {
-      const tables = await query(`
-        SELECT TABLE_NAME 
-        FROM information_schema.TABLES 
-        WHERE TABLE_SCHEMA = ? 
-        AND TABLE_NAME IN ('voice_recognition_logs', 'voice_recognition_tasks')
-      `, [config.database.database])
-      
-      const tableNames = tables.map(t => t.TABLE_NAME)
-      console.log(`  ✅ 语音识别表检查: ${tableNames.length}/2 个表存在`)
-      
-      if (!tableNames.includes('voice_recognition_logs')) {
-        diagnosis.issues.push('❌ 数据库表 voice_recognition_logs 不存在')
-      }
-      if (!tableNames.includes('voice_recognition_tasks')) {
-        diagnosis.issues.push('⚠️  数据库表 voice_recognition_tasks 不存在（可选）')
-      }
-      
-      diagnosis.localEnv.database.tables = tableNames
-    } catch (err) {
-      console.log(`  ⚠️  无法检查表结构: ${err.message}`)
-    }
   } catch (error) {
     console.log(`  ❌ 数据库连接失败: ${error.message}`)
     diagnosis.localEnv.database = { connected: false, error: error.message }
@@ -194,59 +170,6 @@ async function checkLocalDatabase() {
   console.log()
 }
 
-/**
- * 检查本地腾讯云配置
- */
-function checkLocalTencentCloud() {
-  console.log('☁️  检查本地腾讯云配置...')
-  
-  try {
-    const voiceService = getVoiceRecognitionService()
-    
-    if (!voiceService.secretId || !voiceService.secretKey) {
-      console.log('  ❌ 腾讯云密钥未配置')
-      diagnosis.issues.push('❌ 腾讯云密钥未配置')
-      return
-    }
-    
-    console.log(`  ✅ SecretId: ${voiceService.secretId.substring(0, 10)}...`)
-    console.log(`  ✅ SecretKey: ${voiceService.secretKey.substring(0, 10)}...`)
-    console.log(`  ✅ AppId: ${voiceService.appId || '(未设置)'}`)
-    console.log(`  ✅ Region: ${voiceService.region}`)
-    
-    // 测试签名生成
-    try {
-      const timestamp = Math.floor(Date.now() / 1000)
-      const testPayload = { test: 'data' }
-      const signature = voiceService.generateSignature(testPayload, timestamp, 'SentenceRecognition')
-      
-      if (signature && signature.includes('TC3-HMAC-SHA256')) {
-        console.log('  ✅ 签名生成功能正常')
-        diagnosis.localEnv.tencentCloud = {
-          configured: true,
-          signatureWorking: true
-        }
-      } else {
-        console.log('  ⚠️  签名生成可能有问题')
-        diagnosis.localEnv.tencentCloud = {
-          configured: true,
-          signatureWorking: false
-        }
-      }
-    } catch (err) {
-      console.log(`  ⚠️  签名生成测试失败: ${err.message}`)
-      diagnosis.localEnv.tencentCloud = {
-        configured: true,
-        signatureWorking: false,
-        error: err.message
-      }
-    }
-  } catch (error) {
-    console.log(`  ❌ 检查失败: ${error.message}`)
-    diagnosis.issues.push(`❌ 腾讯云配置检查失败: ${error.message}`)
-  }
-  console.log()
-}
 
 /**
  * 检查云托管服务健康状态
@@ -304,20 +227,6 @@ async function checkCloudServiceConfig() {
       if (db.warning) {
         console.log(`  ⚠️  ${db.warning}`)
         diagnosis.issues.push(`⚠️  ${db.warning}`)
-      }
-      
-      // 检查腾讯云配置
-      const tencent = response.data.tencentCloud || {}
-      if (tencent.hasSecretId && tencent.hasSecretKey) {
-        console.log('  ✅ 腾讯云密钥已配置')
-        console.log(`  SecretId: ${tencent.secretIdPrefix}`)
-        console.log(`  SecretKey: ${tencent.secretKeyPrefix}`)
-        console.log(`  AppId: ${tencent.appId}`)
-        console.log(`  Region: ${tencent.region}`)
-      } else {
-        console.log('  ❌ 腾讯云密钥未配置')
-        diagnosis.issues.push('❌ 云托管服务中腾讯云密钥未配置')
-        diagnosis.recommendations.push('请在云托管环境变量中配置 TENCENTCLOUD_SECRET_ID、TENCENTCLOUD_SECRET_KEY、TENCENT_APP_ID（推荐使用标准变量名）')
       }
       
       // 检查诊断信息
@@ -410,10 +319,7 @@ async function main() {
     // 2. 检查本地数据库连接
     await checkLocalDatabase()
     
-    // 3. 检查本地腾讯云配置
-    checkLocalTencentCloud()
-    
-    // 4. 检查云托管服务健康状态
+    // 3. 检查云托管服务健康状态
     await checkCloudServiceHealth()
     
     // 5. 如果服务可访问，检查配置

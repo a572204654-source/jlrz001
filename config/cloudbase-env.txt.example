@@ -35,15 +35,6 @@ DOUBAO_API_URL=https://ark.cn-beijing.volces.com/api/v3
 # 和风天气配置
 QWEATHER_API_KEY=your_qweather_api_key
 
-# 腾讯云语音识别配置
-# 获取方式：访问 https://console.cloud.tencent.com/cam/capi
-# 进入"访问管理 > API密钥管理"，创建或查看密钥
-# 确保密钥有"语音识别（ASR）"服务权限
-TENCENT_SECRET_ID=your_tencent_secret_id
-TENCENT_SECRET_KEY=your_tencent_secret_key
-TENCENT_APP_ID=your_tencent_app_id
-TENCENT_REGION=ap-guangzhou
-
 # 云托管服务配置
 SERVICE_NAME=express
 SERVICE_DOMAIN=https://your-domain.com

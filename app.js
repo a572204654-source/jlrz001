@@ -25,15 +25,6 @@ var weatherRouter = require('./routes/weather');
 var weatherSimpleRouter = require('./routes/weather-simple');
 var weatherV1Router = require('./routes/v1/weather');
 
-// 语音识别路由（旧版本，保留兼容）
-var voiceRecognitionRouter = require('./routes/voice-recognition');
-
-// 实时语音识别路由（新版本，WebSocket流式）
-var realtimeVoiceRouter = require('./routes/realtime-voice');
-
-// 实时语音识别路由（Socket.IO版本，用于微信云托管）
-const { router: realtimeVoiceSocketIORouter, initSocketIO } = require('./routes/realtime-voice-socketio');
-
 // 中间件
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
@@ -72,25 +63,6 @@ app.use('/api', apiRouter);
 app.use('/api/weather', weatherRouter);
 app.use('/api/weather', weatherSimpleRouter);
 app.use('/api/v1/weather', weatherV1Router);
-
-// 语音识别API路由（旧版本，保留兼容）
-app.use('/api/voice-recognition', voiceRecognitionRouter);
-
-// 实时语音识别API路由（新版本，WebSocket流式）
-app.use('/api/realtime-voice', realtimeVoiceRouter);
-
-// 实时语音识别API路由（Socket.IO版本，用于微信云托管）
-app.use('/api/realtime-voice-socketio', realtimeVoiceSocketIORouter);
-
-// 初始化 Socket.IO（从 bin/www 中获取 io 实例）
-// 这个函数会在服务器启动后被调用
-app.initSocketIO = function() {
-  const io = app.get('io');
-  if (io) {
-    initSocketIO(io);
-    console.log('Socket.IO 实时语音识别已初始化');
-  }
-};
 
 // 健康检查接口（用于云托管健康检测）
 app.get('/health', (req, res) => {
@@ -164,19 +136,6 @@ app.get('/diagnose', (req, res) => {
     wechat: {
       hasAppId: !!process.env.WECHAT_APPID,
       hasAppSecret: !!process.env.WECHAT_APPSECRET
-    },
-    tencentCloud: {
-      // 优先使用标准环境变量名，向后兼容旧变量名
-      hasSecretId: !!(process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID),
-      hasSecretKey: !!(process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY),
-      hasAppId: !!process.env.TENCENT_APP_ID,
-      secretIdPrefix: (process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID) ? 
-        `${(process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID).substring(0, 10)}...` : '(未设置)',
-      secretKeyPrefix: (process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY) ? 
-        `${(process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY).substring(0, 10)}...` : '(未设置)',
-      appId: process.env.TENCENT_APP_ID || '(未设置)',
-      region: process.env.TENCENT_REGION || 'ap-guangzhou',
-      usingStandardVars: !!(process.env.TENCENTCLOUD_SECRET_ID && process.env.TENCENTCLOUD_SECRET_KEY)
     },
     diagnosis: {
       isProduction: process.env.NODE_ENV === 'production',

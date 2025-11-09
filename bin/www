@@ -56,17 +56,6 @@ try {
       console.warn('⚠️  WebSocket 测试接口注册失败');
     }
   }
-  
-  // 初始化 WebSocket 路由（必须在 express-ws 初始化之后）
-  const realtimeVoiceRouter = require('../routes/realtime-voice');
-  if (realtimeVoiceRouter.initWebSocketRoutes) {
-    const success = realtimeVoiceRouter.initWebSocketRoutes();
-    if (success) {
-      console.log('✓ 实时语音识别 WebSocket 路由已注册');
-    } else {
-      console.warn('⚠️  实时语音识别 WebSocket 路由注册失败');
-    }
-  }
 } catch (error) {
   console.error('✗ express-ws 初始化失败:', error.message);
   console.error('错误堆栈:', error.stack);
@@ -172,8 +161,6 @@ function onListening() {
   console.log('✓ 服务器启动成功');
   console.log(`✓ 监听地址: ${bind}`);
   console.log(`✓ 健康检查: http://localhost:${port}/health`);
-  console.log(`✓ WebSocket测试: ws://localhost:${port}/api/realtime-voice/test`);
-  console.log(`✓ WebSocket识别: ws://localhost:${port}/api/realtime-voice/stream`);
   console.log('==================================');
   debug('Listening on ' + bind);
 }
