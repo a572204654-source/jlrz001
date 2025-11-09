@@ -51,17 +51,25 @@ router.post('/recognize', authenticate, upload.single('audio'), async (req, res)
       size: audioSize
     })
 
-    // 获取识别选项
+    // 获取识别选项（确保所有参数都是有效的整数）
+    const safeParseInt = (value, defaultValue) => {
+      if (value === undefined || value === null || value === '') {
+        return defaultValue
+      }
+      const parsed = parseInt(value)
+      return isNaN(parsed) ? defaultValue : parsed
+    }
+
     const options = {
       engineType: req.body.engineType || '16k_zh',
-      voiceFormat: parseInt(req.body.voiceFormat) || 1,
-      needvad: parseInt(req.body.needvad) !== undefined ? parseInt(req.body.needvad) : 1,
-      filterDirty: parseInt(req.body.filterDirty) || 0,
-      filterModal: parseInt(req.body.filterModal) || 0,
-      filterPunc: parseInt(req.body.filterPunc) || 0,
-      convertNumMode: parseInt(req.body.convertNumMode) || 1,
-      wordInfo: parseInt(req.body.wordInfo) || 2,
-      vadSilenceTime: parseInt(req.body.vadSilenceTime) || 200
+      voiceFormat: safeParseInt(req.body.voiceFormat, 1),
+      needvad: req.body.needvad !== undefined ? safeParseInt(req.body.needvad, 1) : 1,
+      filterDirty: safeParseInt(req.body.filterDirty, 0),
+      filterModal: safeParseInt(req.body.filterModal, 0),
+      filterPunc: safeParseInt(req.body.filterPunc, 0),
+      convertNumMode: safeParseInt(req.body.convertNumMode, 1),
+      wordInfo: safeParseInt(req.body.wordInfo, 2),
+      vadSilenceTime: safeParseInt(req.body.vadSilenceTime, 200)
     }
 
     const voiceService = getVoiceRecognitionService()
@@ -132,16 +140,24 @@ function initSocketIO(io) {
           return
         }
 
-        // 获取识别选项
+        // 获取识别选项（确保所有参数都是有效的整数）
+        const safeParseInt = (value, defaultValue) => {
+          if (value === undefined || value === null || value === '') {
+            return defaultValue
+          }
+          const parsed = parseInt(value)
+          return isNaN(parsed) ? defaultValue : parsed
+        }
+
         const options = {
           engineType: data.engineType || '16k_zh',
-          voiceFormat: data.voiceFormat || 1,
-          needvad: data.needvad !== undefined ? data.needvad : 1,
-          filterDirty: data.filterDirty || 0,
-          filterModal: data.filterModal || 0,
-          convertNumMode: data.convertNumMode || 1,
-          wordInfo: data.wordInfo || 2,
-          vadSilenceTime: data.vadSilenceTime || 200
+          voiceFormat: safeParseInt(data.voiceFormat, 1),
+          needvad: data.needvad !== undefined ? safeParseInt(data.needvad, 1) : 1,
+          filterDirty: safeParseInt(data.filterDirty, 0),
+          filterModal: safeParseInt(data.filterModal, 0),
+          convertNumMode: safeParseInt(data.convertNumMode, 1),
+          wordInfo: safeParseInt(data.wordInfo, 2),
+          vadSilenceTime: safeParseInt(data.vadSilenceTime, 200)
         }
 
         console.log('开始实时识别，用户ID:', userId, '选项:', options)
@@ -290,12 +306,13 @@ router.get('/history', authenticate, async (req, res) => {
     const pageSize = parseInt(req.query.pageSize) || 20
     const offset = (page - 1) * pageSize
 
-    // 确保参数是整数类型
+    // 确保参数是整数类型（防止SQL注入）
     const limitValue = Math.max(1, Math.floor(Number(pageSize))) || 20
     const offsetValue = Math.max(0, Math.floor(Number(offset)))
 
     // 查询识别历史
-    // 使用 LIMIT offset, count 格式，可能更兼容某些 MySQL 版本
+    // 注意：某些 MySQL 版本不支持在 LIMIT/OFFSET 中使用参数绑定
+    // 因此使用字符串拼接，但确保参数是安全的整数
     const logs = await query(
       `SELECT 
         id,
@@ -307,8 +324,8 @@ router.get('/history', authenticate, async (req, res) => {
        FROM voice_recognition_logs
        WHERE user_id = ?
        ORDER BY created_at DESC
-       LIMIT ?, ?`,
-      [userId, offsetValue, limitValue]
+       LIMIT ${limitValue} OFFSET ${offsetValue}`,
+      [userId]
     )
 
     // 查询总数
