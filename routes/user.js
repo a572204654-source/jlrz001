@@ -70,23 +70,32 @@ router.get('/info', authenticate, async (req, res) => {
  * 
  * 请求参数:
  * - nickname: 用户昵称
- * - avatar: 用户头像
- * - organization: 所属监理机构
+ * - avatar: 用户头像URL
+ * 
+ * 请求头:
+ * - Authorization: Bearer {token}
+ * 
+ * 响应格式:
+ * {
+ *   "code": 0,
+ *   "message": "更新成功",
+ *   "data": {},
+ *   "timestamp": 1699200000000
+ * }
  */
 router.put('/info', authenticate, async (req, res) => {
   try {
     const userId = req.userId
-    const { nickname, avatar, organization } = req.body
+    const { nickname, avatar } = req.body
 
-    // 更新用户信息
+    // 更新用户信息（只更新 nickname 和 avatar 字段）
     await query(
       `UPDATE users SET 
         nickname = COALESCE(?, nickname),
         avatar = COALESCE(?, avatar),
-        organization = COALESCE(?, organization),
         updated_at = NOW()
       WHERE id = ?`,
-      [nickname ?? null, avatar ?? null, organization ?? null, userId]
+      [nickname ?? null, avatar ?? null, userId]
     )
 
     return success(res, {}, '更新成功')
