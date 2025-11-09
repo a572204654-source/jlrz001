@@ -48,8 +48,13 @@ class VoiceRecognitionService {
 
   /**
    * 生成腾讯云API签名（用于一句话识别）
+   * 参考文档: https://cloud.tencent.com/document/api/598/38504
+   * @param {Object} payload - 请求体数据
+   * @param {Number} timestamp - 时间戳（秒）
+   * @param {String} action - API动作名称
+   * @returns {String} Authorization 字符串
    */
-  generateSignature(payload, timestamp) {
+  generateSignature(payload, timestamp, action) {
     try {
       const date = new Date(timestamp * 1000).toISOString().split('T')[0]
       
@@ -57,11 +62,30 @@ class VoiceRecognitionService {
       const httpRequestMethod = 'POST'
       const canonicalUri = '/'
       const canonicalQueryString = ''
-      const canonicalHeaders = `content-type:application/json; charset=utf-8\nhost:${this.host}\n`
-      const signedHeaders = 'content-type;host'
+      
+      // 构建规范请求头（按字母顺序排序，名称小写，值去除前后空格）
+      const headers = {
+        'content-type': 'application/json; charset=utf-8',
+        'host': this.host,
+        'x-tc-action': action.toLowerCase(),
+        'x-tc-region': this.region.toLowerCase(),
+        'x-tc-timestamp': timestamp.toString(),
+        'x-tc-version': this.version
+      }
+      
+      // 按字母顺序排序头部
+      const sortedHeaderKeys = Object.keys(headers).sort()
+      const canonicalHeaders = sortedHeaderKeys
+        .map(key => `${key}:${headers[key]}`)
+        .join('\n') + '\n'
+      
+      const signedHeaders = sortedHeaderKeys.join(';')
+      
+      // 计算请求体哈希
+      const requestPayload = JSON.stringify(payload)
       const hashedRequestPayload = crypto
         .createHash('sha256')
-        .update(JSON.stringify(payload))
+        .update(requestPayload)
         .digest('hex')
       
       const canonicalRequest = [
@@ -82,7 +106,7 @@ class VoiceRecognitionService {
       
       const stringToSign = [
         this.algorithm,
-        timestamp,
+        timestamp.toString(),
         credentialScope,
         hashedCanonicalRequest
       ].join('\n')
@@ -128,7 +152,7 @@ class VoiceRecognitionService {
   async callApi(action, payload) {
     try {
       const timestamp = Math.floor(Date.now() / 1000)
-      const authorization = this.generateSignature(payload, timestamp)
+      const authorization = this.generateSignature(payload, timestamp, action)
 
       const response = await axios({
         method: 'POST',
@@ -146,12 +170,22 @@ class VoiceRecognitionService {
         timeout: 30000
       })
 
-      if (response.data.Response.Error) {
+      if (response.data.Response && response.data.Response.Error) {
         throw new Error(response.data.Response.Error.Message)
       }
 
       return response.data.Response
     } catch (error) {
+      // 处理 axios 错误响应
+      if (error.response && error.response.data) {
+        const errorData = error.response.data
+        if (errorData.Response && errorData.Response.Error) {
+          const errorMsg = errorData.Response.Error.Message
+          const errorCode = errorData.Response.Error.Code
+          console.error(`调用腾讯云API错误 [${errorCode}]:`, errorMsg)
+          throw new Error(`${errorCode}: ${errorMsg}`)
+        }
+      }
       console.error('调用腾讯云API错误:', error.message)
       throw error
     }

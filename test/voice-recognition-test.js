@@ -71,7 +71,9 @@ try {
     SubServiceType: 2
   }
   
-  const signature = voiceService.generateSignature(testPayload, timestamp)
+  // 一句话识别的API动作名称
+  const action = 'SentenceRecognition'
+  const signature = voiceService.generateSignature(testPayload, timestamp, action)
   
   if (signature && signature.includes('TC3-HMAC-SHA256')) {
     console.log('✓ 签名生成成功')

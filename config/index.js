@@ -73,9 +73,11 @@ module.exports = {
   },
 
   // 腾讯云配置（语音识别）
+  // 优先使用标准环境变量名 TENCENTCLOUD_SECRET_ID/TENCENTCLOUD_SECRET_KEY
+  // 如果没有配置，则回退到 TENCENT_SECRET_ID/TENCENT_SECRET_KEY（向后兼容）
   tencentCloud: {
-    secretId: process.env.TENCENT_SECRET_ID || '',
-    secretKey: process.env.TENCENT_SECRET_KEY || '',
+    secretId: process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID || '',
+    secretKey: process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY || '',
     appId: process.env.TENCENT_APP_ID || '',
     region: process.env.TENCENT_REGION || 'ap-guangzhou'
   }

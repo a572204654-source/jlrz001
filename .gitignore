@@ -113,3 +113,6 @@ DEPLOY_CHECKLIST.md
 # 密钥文件（和风天气 JWT 认证）
 *.pem
 
+# 敏感配置文件（包含密钥和密码）
+config/cloudbase-env.txt
+

@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS `voice_recognition_tasks` (
 -- 3. 语音识别与监理日志关联表（可选）
 CREATE TABLE IF NOT EXISTS `supervision_log_voices` (
   `id` INT NOT NULL AUTO_INCREMENT COMMENT '关联ID',
-  `log_id` INT NOT NULL COMMENT '监理日志ID',
+  `log_id` INT UNSIGNED NOT NULL COMMENT '监理日志ID',
   `voice_log_id` INT NOT NULL COMMENT '语音识别日志ID',
   `field_name` VARCHAR(100) COMMENT '关联字段名称：project_dynamics-工程动态, supervision_work-监理工作, safety_work-安全工作',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

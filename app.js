@@ -153,6 +153,19 @@ app.get('/diagnose', (req, res) => {
       hasAppId: !!process.env.WECHAT_APPID,
       hasAppSecret: !!process.env.WECHAT_APPSECRET
     },
+    tencentCloud: {
+      // 优先使用标准环境变量名，向后兼容旧变量名
+      hasSecretId: !!(process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID),
+      hasSecretKey: !!(process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY),
+      hasAppId: !!process.env.TENCENT_APP_ID,
+      secretIdPrefix: (process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID) ? 
+        `${(process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID).substring(0, 10)}...` : '(未设置)',
+      secretKeyPrefix: (process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY) ? 
+        `${(process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY).substring(0, 10)}...` : '(未设置)',
+      appId: process.env.TENCENT_APP_ID || '(未设置)',
+      region: process.env.TENCENT_REGION || 'ap-guangzhou',
+      usingStandardVars: !!(process.env.TENCENTCLOUD_SECRET_ID && process.env.TENCENTCLOUD_SECRET_KEY)
+    },
     diagnosis: {
       isProduction: process.env.NODE_ENV === 'production',
       shouldUseInternal: process.env.NODE_ENV === 'production',

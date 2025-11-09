@@ -290,10 +290,12 @@ router.get('/history', authenticate, async (req, res) => {
     )
 
     // 查询总数
-    const [countResult] = await query(
+    const countResults = await query(
       'SELECT COUNT(*) as total FROM voice_recognition_logs WHERE user_id = ?',
       [userId]
     )
+
+    const countResult = countResults && countResults.length > 0 ? countResults[0] : { total: 0 }
 
     return success(res, {
       list: logs.map(log => ({
@@ -307,7 +309,7 @@ router.get('/history', authenticate, async (req, res) => {
       pagination: {
         page,
         pageSize,
-        total: countResult.total
+        total: countResult.total || 0
       }
     })
 
