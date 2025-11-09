@@ -199,7 +199,7 @@ function initSocketIO(io) {
     })
 
     // 监听客户端的 'audio' 事件
-    socket.on('audio', (data) => {
+    socket.on('audio', async (data) => {
       try {
         if (!recognition) {
           socket.emit('error', { message: '识别服务未初始化' })
@@ -210,8 +210,8 @@ function initSocketIO(io) {
         const audioData = Buffer.from(data.data, 'base64')
         audioSize += audioData.length
 
-        // 发送到腾讯云
-        recognition.send(audioData, data.isEnd || false)
+        // 发送到腾讯云（等待连接建立）
+        await recognition.send(audioData, data.isEnd || false)
 
         // 如果是最后一帧，发送完成消息
         if (data.isEnd) {
@@ -290,7 +290,12 @@ router.get('/history', authenticate, async (req, res) => {
     const pageSize = parseInt(req.query.pageSize) || 20
     const offset = (page - 1) * pageSize
 
+    // 确保参数是整数类型
+    const limitValue = Math.max(1, Math.floor(Number(pageSize))) || 20
+    const offsetValue = Math.max(0, Math.floor(Number(offset)))
+
     // 查询识别历史
+    // 使用 LIMIT offset, count 格式，可能更兼容某些 MySQL 版本
     const logs = await query(
       `SELECT 
         id,
@@ -302,8 +307,8 @@ router.get('/history', authenticate, async (req, res) => {
        FROM voice_recognition_logs
        WHERE user_id = ?
        ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`,
-      [userId, pageSize, offset]
+       LIMIT ?, ?`,
+      [userId, offsetValue, limitValue]
     )
 
     // 查询总数
@@ -332,7 +337,16 @@ router.get('/history', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error('获取识别历史错误:', error)
-    return serverError(res, '获取历史记录失败')
+    console.error('错误详情:', {
+      message: error.message,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState,
+      sql: error.sql,
+      userId: req.userId,
+      page: req.query.page,
+      pageSize: req.query.pageSize
+    })
+    return serverError(res, '获取历史记录失败：' + (error.sqlMessage || error.message))
   }
 })
 

@@ -303,9 +303,79 @@ class VoiceRecognitionService {
       let voiceId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       let isFirstFrame = true
 
+      // 连接状态标志
+      let isConnected = false
+      let connectionPromise = null
+      let connectionResolve = null
+      let connectionReject = null
+      let connectionTimeout = null
+      
+      const waitForConnection = () => {
+        // 如果已经连接，再次验证状态
+        if (isConnected && ws.readyState === WebSocket.OPEN) {
+          console.log('连接已建立，状态验证通过')
+          return Promise.resolve()
+        }
+        // 如果连接已经打开但标志未设置，设置标志并返回
+        if (ws.readyState === WebSocket.OPEN) {
+          console.log('连接已打开，设置连接标志')
+          isConnected = true
+          return Promise.resolve()
+        }
+        // 如果连接已关闭，拒绝
+        if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+          console.error('连接已关闭或正在关闭，无法建立连接')
+          return Promise.reject(new Error('WebSocket连接已关闭'))
+        }
+        // 如果正在连接，等待现有Promise
+        if (connectionPromise) {
+          console.log('已有连接Promise，等待现有连接')
+          return connectionPromise
+        }
+        // 创建新的连接Promise
+        connectionPromise = new Promise((resolve, reject) => {
+          connectionResolve = resolve
+          connectionReject = reject
+          
+          console.log('创建新的连接Promise，当前状态:', ws.readyState)
+          console.log('  CONNECTING:', WebSocket.CONNECTING)
+          console.log('  OPEN:', WebSocket.OPEN)
+          console.log('  CLOSING:', WebSocket.CLOSING)
+          console.log('  CLOSED:', WebSocket.CLOSED)
+          
+          // 设置超时
+          connectionTimeout = setTimeout(() => {
+            if (connectionReject) {
+              console.error('WebSocket连接超时')
+              console.error('  当前状态:', ws.readyState)
+              console.error('  连接URL:', wsUrl.replace(/signature=.*/, 'signature=***'))
+              connectionReject(new Error('WebSocket连接超时'))
+              connectionReject = null
+              connectionResolve = null
+              connectionPromise = null
+              connectionTimeout = null
+            }
+          }, 10000) // 10秒超时
+        })
+        return connectionPromise
+      }
+
       // 连接打开
       ws.on('open', () => {
-        console.log('WebSocket连接已建立')
+        isConnected = true
+        console.log('WebSocket连接已建立，readyState:', ws.readyState)
+        // 清除超时
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout)
+          connectionTimeout = null
+        }
+        // 解析Promise
+        if (connectionResolve) {
+          connectionResolve()
+          connectionResolve = null
+          connectionReject = null
+          connectionPromise = null
+        }
       })
 
       // 接收消息
@@ -344,6 +414,18 @@ class VoiceRecognitionService {
       // 连接错误
       ws.on('error', (error) => {
         console.error('WebSocket错误:', error)
+        // 清除超时
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout)
+          connectionTimeout = null
+        }
+        // 拒绝Promise
+        if (connectionReject) {
+          connectionReject(error)
+          connectionReject = null
+          connectionResolve = null
+          connectionPromise = null
+        }
         if (onError) {
           onError(error)
         }
@@ -352,18 +434,54 @@ class VoiceRecognitionService {
       // 连接关闭
       ws.on('close', (code, reason) => {
         console.log('WebSocket连接已关闭:', code, reason.toString())
+        isConnected = false
+        // 如果连接关闭时还有未完成的Promise，拒绝它
+        if (connectionReject) {
+          connectionReject(new Error(`WebSocket连接已关闭: ${code} ${reason.toString()}`))
+          connectionReject = null
+          connectionResolve = null
+          connectionPromise = null
+        }
+        // 清除超时
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout)
+          connectionTimeout = null
+        }
       })
 
       // 返回控制接口
       return {
         /**
+         * 等待连接建立
+         * @returns {Promise}
+         */
+        waitForConnection: waitForConnection,
+        
+        /**
          * 发送音频数据
          * @param {Buffer} audioData - 音频数据
          * @param {Boolean} isEnd - 是否为最后一帧
          */
-        send: (audioData, isEnd = false) => {
+        send: async (audioData, isEnd = false) => {
+          // 等待连接建立
+          try {
+            console.log('开始等待WebSocket连接，当前状态:', ws.readyState, 'isConnected:', isConnected)
+            await waitForConnection()
+            console.log('等待连接完成，当前状态:', ws.readyState, 'isConnected:', isConnected)
+          } catch (error) {
+            console.error('等待连接建立失败:', error)
+            console.error('连接详细信息 - readyState:', ws.readyState, 'isConnected:', isConnected, 'URL:', wsUrl)
+            throw new Error('WebSocket连接失败：' + error.message)
+          }
+          
+          // 再次检查连接状态
           if (ws.readyState !== WebSocket.OPEN) {
-            throw new Error('WebSocket连接未就绪')
+            console.error('连接状态检查失败')
+            console.error('  readyState:', ws.readyState)
+            console.error('  WebSocket.OPEN:', WebSocket.OPEN)
+            console.error('  isConnected:', isConnected)
+            console.error('  URL:', wsUrl)
+            throw new Error(`WebSocket连接未就绪，当前状态: ${ws.readyState} (OPEN=${WebSocket.OPEN})`)
           }
 
           const audioBase64 = audioData.toString('base64')
@@ -476,66 +594,105 @@ class VoiceRecognitionService {
           }
         )
 
-        // 将音频数据分块发送（每40ms发送一次，模拟实时流）
-        // 16k采样率，16bit，单声道：每秒3200字节，40ms = 128字节
-        const chunkSize = 128 * 10 // 每次发送1280字节（约400ms的音频）
-        let offset = 0
-
-        const sendChunk = () => {
-          if (offset >= audioData.length) {
-            // 所有数据已发送完成，等待识别结果
-            // 如果超时还没有收到最终结果，直接返回当前结果
-            setTimeout(() => {
+        // 等待连接建立后再开始发送数据
+        recognition.waitForConnection()
+          .then(() => {
+            // 再次验证连接状态
+            const readyState = recognition.getReadyState()
+            if (readyState !== 1) { // WebSocket.OPEN = 1
+              console.error('连接状态异常，readyState:', readyState)
               if (!isResolved) {
                 isResolved = true
-                recognition.close()
-                resolve({
-                  text: finalText || allTexts.join(''),
-                  wordList: wordList,
-                  audioTime: Math.ceil(audioData.length / 3200)
-                })
+                reject(new Error(`WebSocket连接未就绪，状态: ${readyState}`))
               }
-            }, 3000) // 3秒超时
-            return
-          }
+              return
+            }
+            
+            console.log('连接已建立，开始发送音频数据，readyState:', readyState)
+            // 将音频数据分块发送（每40ms发送一次，模拟实时流）
+            // 16k采样率，16bit，单声道：每秒3200字节，40ms = 128字节
+            const chunkSize = 128 * 10 // 每次发送1280字节（约400ms的音频）
+            let offset = 0
 
-          const chunk = audioData.slice(offset, offset + chunkSize)
-          const isLastChunk = offset + chunkSize >= audioData.length
+            const sendChunk = async () => {
+              if (offset >= audioData.length) {
+                // 所有数据已发送完成，等待识别结果
+                // 如果超时还没有收到最终结果，直接返回当前结果
+                setTimeout(() => {
+                  if (!isResolved) {
+                    isResolved = true
+                    recognition.close()
+                    resolve({
+                      text: finalText || allTexts.join(''),
+                      wordList: wordList,
+                      audioTime: Math.ceil(audioData.length / 3200)
+                    })
+                  }
+                }, 3000) // 3秒超时
+                return
+              }
 
-          try {
-            recognition.send(chunk, isLastChunk)
-          } catch (error) {
+              const chunk = audioData.slice(offset, offset + chunkSize)
+              const isLastChunk = offset + chunkSize >= audioData.length
+
+              try {
+                // 确保连接已建立，如果连接关闭则重试等待
+                let retryCount = 0
+                while (recognition.getReadyState() !== 1 && retryCount < 3) {
+                  console.log(`连接状态异常，重试等待连接 (${retryCount + 1}/3)`)
+                  await recognition.waitForConnection()
+                  retryCount++
+                  // 等待一小段时间让连接稳定
+                  await new Promise(resolve => setTimeout(resolve, 100))
+                }
+                
+                // 最终检查连接状态
+                if (recognition.getReadyState() !== 1) {
+                  throw new Error(`WebSocket连接未就绪，状态: ${recognition.getReadyState()}`)
+                }
+                
+                await recognition.send(chunk, isLastChunk)
+              } catch (error) {
+                console.error('发送音频数据错误:', error)
+                console.error('当前连接状态:', recognition.getReadyState())
+                if (!isResolved) {
+                  isResolved = true
+                  reject(new Error('发送音频数据失败：' + error.message))
+                }
+                return
+              }
+
+              offset += chunkSize
+
+              if (!isLastChunk) {
+                // 模拟实时发送，每40ms发送一次
+                setTimeout(sendChunk, 40)
+              } else {
+                // 如果是最后一帧，等待识别结果
+                // 如果超时还没有收到最终结果，直接返回当前结果
+                setTimeout(() => {
+                  if (!isResolved) {
+                    isResolved = true
+                    recognition.close()
+                    resolve({
+                      text: finalText || allTexts.join(''),
+                      wordList: wordList,
+                      audioTime: Math.ceil(audioData.length / 3200)
+                    })
+                  }
+                }, 3000) // 3秒超时
+              }
+            }
+
+            // 开始发送音频数据
+            sendChunk()
+          })
+          .catch((error) => {
             if (!isResolved) {
               isResolved = true
-              reject(new Error('发送音频数据失败：' + error.message))
+              reject(new Error('WebSocket连接失败：' + error.message))
             }
-            return
-          }
-
-          offset += chunkSize
-
-          if (!isLastChunk) {
-            // 模拟实时发送，每40ms发送一次
-            setTimeout(sendChunk, 40)
-          } else {
-            // 如果是最后一帧，等待识别结果
-            // 如果超时还没有收到最终结果，直接返回当前结果
-            setTimeout(() => {
-              if (!isResolved) {
-                isResolved = true
-                recognition.close()
-                resolve({
-                  text: finalText || allTexts.join(''),
-                  wordList: wordList,
-                  audioTime: Math.ceil(audioData.length / 3200)
-                })
-              }
-            }, 3000) // 3秒超时
-          }
-        }
-
-        // 开始发送音频数据
-        sendChunk()
+          })
 
       } catch (error) {
         console.error('实时识别文件错误:', error)

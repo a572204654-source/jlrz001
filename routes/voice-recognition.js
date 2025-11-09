@@ -381,7 +381,12 @@ router.get('/history', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error('获取识别历史错误:', error)
-    return serverError(res, '获取历史记录失败')
+    console.error('错误堆栈:', error.stack)
+    // 如果是数据库表不存在，返回更明确的错误信息
+    if (error.code === 'ER_NO_SUCH_TABLE' || error.message.includes('doesn\'t exist')) {
+      return serverError(res, '数据库表不存在，请先执行初始化脚本: scripts/init-voice-recognition-tables.sql')
+    }
+    return serverError(res, error.message || '获取历史记录失败')
   }
 })
 
