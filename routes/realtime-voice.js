@@ -6,7 +6,8 @@ const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 const { getVoiceRecognitionService } = require('../utils/voiceRecognition')
 
-// 注意：WebSocket 支持已在 app.js 中启用，这里不需要重复调用
+// 注意：WebSocket 支持已在 app.js 中通过 expressWs(app) 启用
+// 所有通过 app.use() 挂载的 router 都会自动获得 .ws() 方法
 
 // 配置文件上传（使用内存存储）
 const upload = multer({

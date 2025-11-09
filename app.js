@@ -9,6 +9,11 @@ var cors = require('cors');
 // 加载环境变量
 require('dotenv').config();
 
+var app = express();
+
+// 启用WebSocket支持（必须在路由加载之前）
+expressWs(app);
+
 // 路由模块
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -35,11 +40,6 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 // 数据库连接测试
 const { testConnection } = require('./config/database');
-
-var app = express();
-
-// 启用WebSocket支持
-expressWs(app);
 
 // 测试数据库连接
 testConnection().catch(err => {
