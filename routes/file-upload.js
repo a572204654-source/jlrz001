@@ -250,7 +250,7 @@ router.get('/list', authenticate, async (req, res) => {
     )
 
     // 查询总数
-    const countResult = await query(
+    const [countResult] = await query(
       'SELECT COUNT(*) as total FROM file_uploads WHERE user_id = ?',
       [userId]
     )
@@ -267,7 +267,7 @@ router.get('/list', authenticate, async (req, res) => {
     }))
 
     return success(res, {
-      total: countResult[0]?.total || 0,
+      total: countResult?.total || 0,
       page,
       pageSize,
       list
@@ -275,7 +275,8 @@ router.get('/list', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error('获取文件列表错误:', error)
-    return serverError(res, '获取文件列表失败')
+    console.error('错误堆栈:', error.stack)
+    return serverError(res, '获取文件列表失败：' + error.message)
   }
 })
 
