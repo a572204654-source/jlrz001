@@ -1,6 +1,6 @@
 /**
- * 测试文件上传功能 - 检查豆包返回数据
- * 使用方法: node test/test-file-upload.js
+ * 测试PDF文件上传到豆包
+ * 使用方法: node test/test-file-upload-pdf.js
  */
 
 const axios = require('axios')
@@ -10,8 +10,8 @@ const path = require('path')
 
 // 配置
 const CONFIG = {
-  baseURL: process.env.TEST_BASE_URL || 'http://localhost:80', // 本地测试环境
-  testOpenid: 'test_openid_001' // 测试用户openid
+  baseURL: process.env.TEST_BASE_URL || 'http://localhost:80',
+  testOpenid: 'test_openid_001'
 }
 
 // 颜色输出
@@ -87,7 +87,6 @@ async function testLogin() {
       return true
     } else {
       error(`登录失败: ${response.data.message}`)
-      warning('提示: 请确保数据库中存在测试用户')
       return false
     }
   } catch (err) {
@@ -101,10 +100,79 @@ async function testLogin() {
 }
 
 /**
- * 步骤2：上传文件到豆包
+ * 创建一个简单的PDF文件
  */
-async function testFileUpload() {
-  section('步骤2：上传文件到豆包')
+function createTestPDF() {
+  const testContent = '这是一个测试PDF文件，用于测试豆包文件上传功能。\n时间: ' + new Date().toISOString()
+  
+  // 创建一个简单的PDF文件（最小PDF格式）
+  const pdfContent = Buffer.from(`%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+/Resources <<
+/Font <<
+/F1 <<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>
+>>
+>>
+>>
+endobj
+4 0 obj
+<<
+/Length 44
+>>
+stream
+BT
+/F1 12 Tf
+100 700 Td
+(${testContent}) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000306 00000 n 
+trailer
+<<
+/Size 5
+/Root 1 0 R
+>>
+startxref
+390
+%%EOF`)
+  
+  return pdfContent
+}
+
+/**
+ * 步骤2：上传PDF文件到豆包
+ */
+async function testPDFUpload() {
+  section('步骤2：上传PDF文件到豆包')
   
   if (!token) {
     error('未获取到token，无法继续测试')
@@ -112,25 +180,25 @@ async function testFileUpload() {
   }
   
   try {
-    // 创建一个测试文件
-    const testFileName = 'test-file.txt'
-    const testFileContent = '这是一个测试文件，用于测试文件上传功能。\n时间: ' + new Date().toISOString()
+    // 创建测试PDF文件
+    const testFileName = 'test-doubao-upload.pdf'
     const testFilePath = path.join(__dirname, testFileName)
+    const pdfBuffer = createTestPDF()
     
     // 写入测试文件
-    fs.writeFileSync(testFilePath, testFileContent, 'utf8')
-    info(`创建测试文件: ${testFileName}`)
+    fs.writeFileSync(testFilePath, pdfBuffer)
+    info(`创建测试PDF文件: ${testFileName}`)
+    info(`文件大小: ${pdfBuffer.length} 字节`)
     
     // 创建FormData
     const form = new FormData()
-    form.append('file', fs.createReadStream(testFilePath), {
+    form.append('file', pdfBuffer, {
       filename: testFileName,
-      contentType: 'text/plain'
+      contentType: 'application/pdf'
     })
     form.append('fileType', 'document')
     
-    info('开始上传文件到豆包...')
-    info(`文件大小: ${fs.statSync(testFilePath).size} 字节`)
+    info('开始上传PDF文件到豆包...')
     
     // 上传文件
     const response = await client.post('/api/file-upload/doubao', form, {
@@ -163,6 +231,15 @@ async function testFileUpload() {
       info(`文件大小: ${data.fileSize} 字节`)
       info(`上传时间: ${data.uploadTime}`)
       
+      // 检查是否有豆包文件ID
+      console.log('\n')
+      if (data.doubaoFileId) {
+        success(`✅ 豆包文件ID: ${data.doubaoFileId}`)
+        success('✅ 豆包上传成功！')
+      } else {
+        warning('⚠️  未获取到豆包文件ID（可能豆包上传失败）')
+      }
+      
       return data
     } else {
       error(`文件上传失败: ${response.data.message}`)
@@ -175,99 +252,8 @@ async function testFileUpload() {
       error(`响应状态: ${err.response.status}`)
       error(`响应数据: ${JSON.stringify(err.response.data, null, 2)}`)
     }
-    if (err.request) {
-      error('请求详情:', JSON.stringify(err.request, null, 2))
-    }
     return null
   }
-}
-
-/**
- * 步骤3：查询文件列表
- */
-async function testFileList() {
-  section('步骤3：查询文件列表')
-  
-  if (!token) {
-    error('未获取到token，无法继续测试')
-    return
-  }
-  
-  try {
-    const response = await client.get('/api/file-upload/list', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      params: {
-        page: 1,
-        pageSize: 10
-      }
-    })
-    
-    if (response.data.code === 0) {
-      success('获取文件列表成功')
-      
-      const data = response.data.data
-      info(`总数: ${data.total}`)
-      info(`当前页: ${data.page}`)
-      info(`每页数量: ${data.pageSize}`)
-      info(`文件数量: ${data.list.length}`)
-      
-      if (data.list.length > 0) {
-        console.log('\n📋 文件列表:')
-        data.list.forEach((file, index) => {
-          console.log(`\n文件 ${index + 1}:`)
-          console.log(`  文件ID: ${file.fileId}`)
-          console.log(`  文件名: ${file.fileName}`)
-          console.log(`  文件类型: ${file.fileType}`)
-          console.log(`  文件大小: ${file.fileSize} 字节`)
-          console.log(`  文件URL: ${file.fileUrl}`)
-          console.log(`  豆包文件ID: ${file.doubaoFileId || '(无)'}`)
-          console.log(`  上传时间: ${file.uploadTime}`)
-        })
-      } else {
-        warning('文件列表为空')
-      }
-    } else {
-      error(`获取文件列表失败: ${response.data.message}`)
-    }
-  } catch (err) {
-    error(`获取文件列表请求失败: ${err.message}`)
-    if (err.response) {
-      error(`响应状态: ${err.response.status}`)
-      error(`响应数据: ${JSON.stringify(err.response.data, null, 2)}`)
-    }
-  }
-}
-
-/**
- * 步骤4：检查服务器日志中的豆包返回数据
- * 注意：这个步骤需要查看服务器日志，这里只是提示
- */
-function checkDoubaoResponse() {
-  section('步骤4：检查豆包返回数据')
-  
-  info('豆包返回的数据会在服务器日志中显示')
-  info('请查看服务器日志，查找以下信息:')
-  console.log('\n  1. "开始上传文件到豆包: ..."')
-  console.log('  2. "文件上传到豆包成功，豆包文件ID: ..."')
-  console.log('  3. "豆包返回文件URL: ..." (如果有)')
-  console.log('\n  如果上传失败，会显示:')
-  console.log('  "上传到豆包失败: ..."')
-  
-  warning('\n提示: 豆包的完整响应数据在代码中已记录')
-  info('查看 routes/file-upload.js 中的 uploadToDoubao 函数')
-  info('查看 utils/doubao.js 中的相关代码')
-  
-  console.log('\n📝 豆包API响应格式检查:')
-  console.log('  代码中会尝试从以下字段获取文件ID:')
-  console.log('    - response.data.id')
-  console.log('    - response.data.fileId')
-  console.log('    - response.data.file_id')
-  console.log('\n  代码中会尝试从以下字段获取文件URL:')
-  console.log('    - response.data.url')
-  console.log('    - response.data.fileUrl')
-  console.log('    - response.data.file_url')
 }
 
 /**
@@ -275,7 +261,7 @@ function checkDoubaoResponse() {
  */
 async function runTests() {
   console.log('\n')
-  log('🧪 文件上传功能测试 - 检查豆包返回数据', 'bright')
+  log('🧪 PDF文件上传到豆包测试', 'bright')
   log(`测试环境: ${CONFIG.baseURL}`, 'cyan')
   log(`开始时间: ${new Date().toLocaleString()}`, 'cyan')
   
@@ -287,36 +273,18 @@ async function runTests() {
       process.exit(1)
     }
     
-    // 步骤2：上传文件
-    const fileData = await testFileUpload()
+    // 步骤2：上传PDF文件
+    const fileData = await testPDFUpload()
     if (fileData) {
       console.log('\n')
-      success('文件上传测试完成')
-      
-      // 检查是否有豆包文件ID
       if (fileData.doubaoFileId) {
-        success(`豆包文件ID: ${fileData.doubaoFileId}`)
+        success('✅ 测试完成 - 豆包上传成功！')
       } else {
-        warning('未获取到豆包文件ID（可能豆包上传失败）')
-      }
-      
-      // 检查文件URL
-      if (fileData.fileUrl) {
-        if (fileData.fileUrl.includes('doubao') || fileData.fileUrl.includes('volces')) {
-          success(`使用豆包URL: ${fileData.fileUrl}`)
-        } else {
-          info(`使用本地存储URL: ${fileData.fileUrl}`)
-        }
+        warning('⚠️  测试完成 - 但未获取到豆包文件ID')
       }
     } else {
       error('文件上传测试失败')
     }
-    
-    // 步骤3：查询文件列表
-    await testFileList()
-    
-    // 步骤4：检查豆包返回数据说明
-    checkDoubaoResponse()
     
     console.log('\n')
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'cyan')

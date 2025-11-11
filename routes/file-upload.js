@@ -68,23 +68,27 @@ router.post('/doubao', authenticate, upload.single('file'), async (req, res) => 
     const localFileName = fileId + fileExt
     const localFilePath = path.join(uploadsDir, localFileName)
 
-    console.log(`开始上传文件到豆包: ${finalFileName}, 大小: ${file.size} 字节`)
-
-    // 流式上传到豆包
+    // 流式上传到豆包（仅支持的文件类型）
     let doubaoFileId = ''
     let doubaoFileUrl = '' // 豆包返回的文件URL（如果有）
-    try {
-      const doubaoResult = await uploadToDoubao(file.buffer, finalFileName)
-      doubaoFileId = doubaoResult.id || doubaoResult.fileId || ''
-      doubaoFileUrl = doubaoResult.url || doubaoResult.fileUrl || ''
-      console.log(`文件上传到豆包成功，豆包文件ID: ${doubaoFileId}`)
-      if (doubaoFileUrl) {
-        console.log(`豆包返回文件URL: ${doubaoFileUrl}`)
+    
+    if (isDoubaoSupportedFileType(finalFileName)) {
+      console.log(`开始上传文件到豆包: ${finalFileName}, 大小: ${file.size} 字节`)
+      try {
+        const doubaoResult = await uploadToDoubao(file.buffer, finalFileName)
+        doubaoFileId = doubaoResult.id || doubaoResult.fileId || ''
+        doubaoFileUrl = doubaoResult.url || doubaoResult.fileUrl || ''
+        console.log(`文件上传到豆包成功，豆包文件ID: ${doubaoFileId}`)
+        if (doubaoFileUrl) {
+          console.log(`豆包返回文件URL: ${doubaoFileUrl}`)
+        }
+      } catch (error) {
+        console.error('上传到豆包失败:', error.message)
+        // 如果豆包上传失败，仍然保存文件记录，但doubao_file_id为空
+        // 这样用户可以在后续重试
       }
-    } catch (error) {
-      console.error('上传到豆包失败:', error.message)
-      // 如果豆包上传失败，仍然保存文件记录，但doubao_file_id为空
-      // 这样用户可以在后续重试
+    } else {
+      console.log(`文件类型 ${finalFileName} 不被豆包API支持，跳过豆包上传，仅保存到本地`)
     }
 
     // 保存文件到本地
@@ -109,7 +113,8 @@ router.post('/doubao', authenticate, upload.single('file'), async (req, res) => 
       fileName: finalFileName,
       fileType: finalFileType,
       fileSize: file.size,
-      uploadTime: new Date().toISOString()
+      uploadTime: new Date().toISOString(),
+      doubaoFileId: doubaoFileId || null // 豆包文件ID（如果有）
     }, '上传成功')
 
   } catch (error) {
@@ -136,6 +141,8 @@ async function uploadToDoubao(fileBuffer, fileName) {
     filename: fileName,
     contentType: getContentType(fileName)
   })
+  // 豆包API要求必须指定purpose参数，值为user_data
+  form.append('purpose', 'user_data')
 
   // 调用豆包文件上传API
   console.log(`[豆包上传] 请求URL: ${config.doubao.apiUrl}/files`)
@@ -164,14 +171,20 @@ async function uploadToDoubao(fileBuffer, fileName) {
 
   // 解析响应
   if (response.data) {
-    const fileId = response.data.id || response.data.fileId || response.data.file_id
+    // 豆包API返回的文件ID在 response.data.id 中
+    const fileId = response.data.id || response.data.fileId || response.data.file_id || ''
+    // 豆包API通常不返回文件URL，只有文件ID
     const fileUrl = response.data.url || response.data.fileUrl || response.data.file_url || ''
+    
+    if (!fileId) {
+      throw new Error('豆包API响应中未找到文件ID：' + JSON.stringify(response.data))
+    }
     
     console.log(`[豆包上传] 解析后的文件ID: ${fileId}`)
     if (fileUrl) {
       console.log(`[豆包上传] 解析后的文件URL: ${fileUrl}`)
     } else {
-      console.log(`[豆包上传] 豆包未返回文件URL`)
+      console.log(`[豆包上传] 豆包未返回文件URL（这是正常的，豆包API通常只返回文件ID）`)
     }
     
     // 返回文件ID和可能的URL
@@ -182,6 +195,19 @@ async function uploadToDoubao(fileBuffer, fileName) {
   } else {
     throw new Error('豆包API响应格式异常：' + JSON.stringify(response.data))
   }
+}
+
+/**
+ * 检查文件类型是否被豆包API支持
+ * 豆包API支持的文件类型：PDF、图片、Office文档等，但不支持纯文本文件
+ * @param {string} fileName - 文件名
+ * @returns {boolean} 是否支持
+ */
+function isDoubaoSupportedFileType(fileName) {
+  const ext = fileName.split('.').pop().toLowerCase()
+  // 豆包API不支持的文件类型
+  const unsupportedTypes = ['txt', 'md', 'log', 'csv']
+  return !unsupportedTypes.includes(ext)
 }
 
 /**
@@ -232,7 +258,7 @@ router.get('/list', authenticate, async (req, res) => {
     const pageSize = parseInt(req.query.pageSize) || 20
     const offset = (page - 1) * pageSize
 
-    // 查询文件列表
+    // 查询文件列表（LIMIT 和 OFFSET 使用字符串拼接，因为都是我们控制的整数）
     const files = await query(
       `SELECT 
         file_id,
@@ -245,12 +271,12 @@ router.get('/list', authenticate, async (req, res) => {
        FROM file_uploads
        WHERE user_id = ?
        ORDER BY upload_time DESC
-       LIMIT ? OFFSET ?`,
-      [userId, pageSize, offset]
+       LIMIT ${parseInt(pageSize)} OFFSET ${parseInt(offset)}`,
+      [userId]
     )
 
     // 查询总数
-    const [countResult] = await query(
+    const countResult = await query(
       'SELECT COUNT(*) as total FROM file_uploads WHERE user_id = ?',
       [userId]
     )
@@ -267,7 +293,7 @@ router.get('/list', authenticate, async (req, res) => {
     }))
 
     return success(res, {
-      total: countResult?.total || 0,
+      total: countResult[0]?.total || 0,
       page,
       pageSize,
       list
