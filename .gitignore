@@ -116,3 +116,7 @@ DEPLOY_CHECKLIST.md
 # 敏感配置文件（包含密钥和密码）
 config/cloudbase-env.txt
 
+# 上传的文件（保留目录结构）
+public/uploads/*
+!public/uploads/.gitkeep
+

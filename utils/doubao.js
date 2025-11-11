@@ -3,7 +3,7 @@ const config = require('../config')
 
 /**
  * 调用豆包AI API
- * @param {Array} messages - 对话消息列表 [{role: 'user'|'assistant', content: '...'}]
+ * @param {Array} messages - 对话消息列表 [{role: 'user'|'assistant', content: '...', attachments?: [...]}]
  * @param {Object} options - 可选配置
  * @returns {Promise<string>} AI回复内容
  */
@@ -111,15 +111,26 @@ async function chatWithDoubao(userMessage, options = {}) {
  * @param {Array} conversationHistory - 对话历史 [{role: 'user'|'assistant', content: '...'}]
  * @param {string} newMessage - 新消息
  * @param {Object} options - 可选配置
+ * @param {Array} fileIds - 文件ID列表（可选）
  * @returns {Promise<string>} AI回复
  */
-async function chatWithContext(conversationHistory, newMessage, options = {}) {
+async function chatWithContext(conversationHistory, newMessage, options = {}, fileIds = []) {
+  const userMessage = {
+    role: 'user',
+    content: newMessage
+  }
+
+  // 如果有文件，添加附件
+  if (fileIds && fileIds.length > 0) {
+    userMessage.attachments = fileIds.map(fileId => ({
+      type: 'file',
+      file_id: fileId
+    }))
+  }
+
   const messages = [
     ...conversationHistory,
-    {
-      role: 'user',
-      content: newMessage
-    }
+    userMessage
   ]
   
   // callDoubaoAPI现在会自动处理错误并返回mock数据

@@ -79,6 +79,10 @@ app.use('/users', usersRouter);
 // API路由（监理日志小程序）
 app.use('/api', apiRouter);
 
+// 文件上传路由（AI文件上传）
+const fileUploadRouter = require('./routes/file-upload');
+app.use('/api/file-upload', fileUploadRouter);
+
 // 天气API路由
 app.use('/api/weather', weatherRouter);
 app.use('/api/weather', weatherSimpleRouter);

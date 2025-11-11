@@ -32,27 +32,66 @@ router.post('/session', authenticate, async (req, res) => {
  * 
  * 请求参数:
  * - sessionId: 会话ID（必填）
- * - content: 消息内容（必填）
+ * - content: 消息内容（可选，如果只有文件可以为空）
+ * - files: 文件列表（可选），格式：[{fileId, fileUrl, fileName, fileType}]
  */
 router.post('/send', authenticate, async (req, res) => {
   try {
     const userId = req.userId
-    const { sessionId, content } = req.body
+    const { sessionId, content, files } = req.body
 
     // 参数验证
     if (!sessionId) {
       return badRequest(res, '会话ID不能为空')
     }
-    if (!content) {
-      return badRequest(res, '消息内容不能为空')
+    if (!content && (!files || files.length === 0)) {
+      return badRequest(res, '消息内容或文件至少需要提供一个')
     }
 
-    // 保存用户消息
+    // 验证文件是否存在并获取豆包文件ID
+    let doubaoFileIds = []
+    if (files && files.length > 0) {
+      for (const file of files) {
+        if (!file.fileId) {
+          return badRequest(res, '文件ID不能为空')
+        }
+
+        // 查询文件记录
+        const fileRecords = await query(
+          'SELECT doubao_file_id, file_name FROM file_uploads WHERE file_id = ? AND user_id = ?',
+          [file.fileId, userId]
+        )
+
+        if (fileRecords.length === 0) {
+          return badRequest(res, `文件不存在：${file.fileName || file.fileId}`)
+        }
+
+        const fileRecord = fileRecords[0]
+        if (!fileRecord.doubao_file_id) {
+          return badRequest(res, `文件尚未上传到豆包，请重新上传：${fileRecord.file_name}`)
+        }
+
+        doubaoFileIds.push(fileRecord.doubao_file_id)
+      }
+    }
+
+    // 构建消息内容（如果有文件，添加文件说明）
+    let messageContent = content || ''
+    if (files && files.length > 0) {
+      const fileNames = files.map(f => f.fileName || f.fileId).join('、')
+      if (messageContent) {
+        messageContent += `\n\n附件：${fileNames}`
+      } else {
+        messageContent = `请分析以下文件：${fileNames}`
+      }
+    }
+
+    // 保存用户消息（包含文件信息）
     const userMessageResult = await query(
       `INSERT INTO ai_chat_logs 
         (user_id, session_id, message_type, content, api_provider) 
        VALUES (?, ?, 'user', ?, 'doubao')`,
-      [userId, sessionId, content]
+      [userId, sessionId, messageContent]
     )
 
     // 获取对话历史（最近10条消息作为上下文）
@@ -74,8 +113,13 @@ router.post('/send', authenticate, async (req, res) => {
         content: msg.content
       }))
 
-    // 调用豆包AI API获取回复（如果失败会自动返回模拟数据）
-    const aiReply = await chatWithContext(conversationHistory, content)
+    // 调用豆包AI API获取回复（传递文件ID）
+    const aiReply = await chatWithContext(
+      conversationHistory, 
+      messageContent, 
+      {}, 
+      doubaoFileIds
+    )
 
     // 保存AI回复
     const aiMessageResult = await query(
