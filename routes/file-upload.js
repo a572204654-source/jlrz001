@@ -138,6 +138,10 @@ async function uploadToDoubao(fileBuffer, fileName) {
   })
 
   // 调用豆包文件上传API
+  console.log(`[豆包上传] 请求URL: ${config.doubao.apiUrl}/files`)
+  console.log(`[豆包上传] 文件名: ${fileName}`)
+  console.log(`[豆包上传] 文件大小: ${fileBuffer.length} 字节`)
+  
   const response = await axios.post(
     `${config.doubao.apiUrl}/files`,
     form,
@@ -152,12 +156,28 @@ async function uploadToDoubao(fileBuffer, fileName) {
     }
   )
 
+  // 打印豆包API的完整响应数据
+  console.log('[豆包上传] 豆包API完整响应数据:')
+  console.log(JSON.stringify(response.data, null, 2))
+  console.log('[豆包上传] 响应状态码:', response.status)
+  console.log('[豆包上传] 响应头:', JSON.stringify(response.headers, null, 2))
+
   // 解析响应
   if (response.data) {
+    const fileId = response.data.id || response.data.fileId || response.data.file_id
+    const fileUrl = response.data.url || response.data.fileUrl || response.data.file_url || ''
+    
+    console.log(`[豆包上传] 解析后的文件ID: ${fileId}`)
+    if (fileUrl) {
+      console.log(`[豆包上传] 解析后的文件URL: ${fileUrl}`)
+    } else {
+      console.log(`[豆包上传] 豆包未返回文件URL`)
+    }
+    
     // 返回文件ID和可能的URL
     return {
-      id: response.data.id || response.data.fileId || response.data.file_id,
-      url: response.data.url || response.data.fileUrl || response.data.file_url || ''
+      id: fileId,
+      url: fileUrl
     }
   } else {
     throw new Error('豆包API响应格式异常：' + JSON.stringify(response.data))
@@ -230,7 +250,7 @@ router.get('/list', authenticate, async (req, res) => {
     )
 
     // 查询总数
-    const [countResult] = await query(
+    const countResult = await query(
       'SELECT COUNT(*) as total FROM file_uploads WHERE user_id = ?',
       [userId]
     )
@@ -247,7 +267,7 @@ router.get('/list', authenticate, async (req, res) => {
     }))
 
     return success(res, {
-      total: countResult.total,
+      total: countResult[0]?.total || 0,
       page,
       pageSize,
       list
